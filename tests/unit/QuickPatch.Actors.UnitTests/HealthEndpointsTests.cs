@@ -6,14 +6,13 @@ namespace QuickPatch.Actors.UnitTests;
 
 public class HealthEndpointsTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
 {
-    [Theory]
-    [InlineData("/health/live")]
-    [InlineData("/health/ready")]
-    public async Task HealthEndpoint_RespondeOk(string ruta)
+    // /health/ready consulta PostgreSQL: se prueba en tests/integration.
+    [Fact]
+    public async Task Live_RespondeOkSinDependencias()
     {
         using var client = factory.CreateClient();
 
-        var response = await client.GetAsync(new Uri(ruta, UriKind.Relative));
+        var response = await client.GetAsync(new Uri("/health/live", UriKind.Relative));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }

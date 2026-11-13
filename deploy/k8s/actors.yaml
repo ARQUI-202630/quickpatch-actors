@@ -1,0 +1,84 @@
+# Despliegue de Actors en k3s (namespace quickpatch), igual en QA y producción.
+# Primer despliegue: crear el Secret actors-secretos (deploy/k8s/README.md), reemplazar <vm-mensajeria> por la IP de
+# Kafka del ambiente y aplicar este archivo con `kubectl apply -f deploy/k8s/actors.yaml`.
+# Después, el pipeline actualiza la imagen con `kubectl set image deployment/actors "*=<imagen>"`.
+# Actors no publica endpoints de negocio (ADR-025) ni eventos: no tiene IngressRoute; el Service solo sirve a los probes.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: actors-config
+  namespace: quickpatch
+  labels: { app: actors }
+data:
+  Kafka__BootstrapServers: "<vm-mensajeria>:9092"
+  Kafka__ConsumerGroupId: "actors-service"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: actors
+  namespace: quickpatch
+  labels: { app: actors }
+spec:
+  # Una réplica: el presupuesto de conexiones de PostgreSQL no admite otra (Documento de Infraestructura, quickpatch#196).
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels: { app: actors }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  template:
+    metadata:
+      labels: { app: actors }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        # La imagen declara USER app (por nombre); Kubernetes necesita el UID para verificar que no es root.
+        runAsUser: 1654
+        runAsGroup: 1654
+      initContainers:
+        # Migraciones (EF Core bundle) con el rol actors_migrator, dueño de las tablas (DD 10.2).
+        - name: migraciones
+          image: ghcr.io/arqui-202630/quickpatch-actors:pendiente
+          command: ["/app/efbundle", "--connection", "$(MIGRATOR_CONNECTION)"]
+          env:
+            - name: MIGRATOR_CONNECTION
+              valueFrom: { secretKeyRef: { name: actors-secretos, key: migrator-connection } }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+      containers:
+        - name: actors
+          image: ghcr.io/arqui-202630/quickpatch-actors:pendiente
+          ports:
+            - { name: http, containerPort: 8080 }
+          envFrom:
+            - configMapRef: { name: actors-config }
+          env:
+            - name: ConnectionStrings__Actors
+              valueFrom: { secretKeyRef: { name: actors-secretos, key: app-connection } }
+          readinessProbe:
+            httpGet: { path: /health/ready, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health/live, port: http }
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          # Pendiente de medición (Documento de Infraestructura, 5.6); límite inicial dentro del presupuesto de VM3.
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 320Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: actors
+  namespace: quickpatch
+  labels: { app: actors }
+spec:
+  selector: { app: actors }
+  ports:
+    - { name: http, port: 8080, targetPort: http }
