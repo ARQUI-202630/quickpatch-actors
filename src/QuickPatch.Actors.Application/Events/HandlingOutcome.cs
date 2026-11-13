@@ -1,4 +1,4 @@
-namespace QuickPatch.Actors.Application;
+namespace QuickPatch.Actors.Application.Events;
 
 /// <summary>Resultado de aplicar un evento consumido.</summary>
 public enum HandlingOutcome

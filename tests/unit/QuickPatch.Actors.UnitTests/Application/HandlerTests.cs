@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 
-using QuickPatch.Actors.Application;
 using QuickPatch.Actors.Application.Clients;
+using QuickPatch.Actors.Application.Events;
 using QuickPatch.Actors.Application.Technicians;
 using QuickPatch.Actors.UnitTests.Support;
 
