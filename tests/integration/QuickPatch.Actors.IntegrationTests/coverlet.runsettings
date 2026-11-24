@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Cobertura de las pruebas de integración: solo el código de Actors. quickpatch-shared-dotnet (ADR-020) se compila dentro
+  del servicio, pero tiene sus propias pruebas en su repositorio; Actors no usa su Outbox.
+-->
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat code coverage">
+        <Configuration>
+          <Include>[QuickPatch.Actors.*]*</Include>
+          <ExcludeByFile>**/Migrations/*.cs,**/obj/**/*.g.cs</ExcludeByFile>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>
